@@ -1,0 +1,20 @@
+@import 'reset-css';
+
+.main {
+  padding: 1.5rem 1rem 1rem;
+}
+.main h4 {
+  font-size: calc(1.275rem + 0.3vw);
+}
+.main code {
+  color: #d63384;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+
+.ft-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 14px;
+}
