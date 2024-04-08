@@ -1,3 +1,5 @@
+import { IOpenAttachment } from "@lark-base-open/js-sdk";
+
 export const getBase64FromUrl = (url: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -50,3 +52,8 @@ export const generateUuidByTime = (): string => {
   return `${timestamp}-${random}`;
 };
 
+
+
+export const deepCopy = (obj: any) => {
+	return JSON.parse(JSON.stringify(obj));
+}
