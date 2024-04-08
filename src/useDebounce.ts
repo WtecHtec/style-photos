@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-export function useDebounce(fn: any, time = 1000, fileds = []) {
+export function useDebounce(fn: any, time = 1000, fileds: any[] = []) {
 	const ref = useRef<any>({
 		fn,
 		timer: null

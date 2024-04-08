@@ -1,22 +1,20 @@
 import './app.css';
 import { bitable, FieldType, IAttachmentField, } from "@lark-base-open/js-sdk";
-import { Banner, Typography, Select, Switch, Button, Empty, Image, Modal, Spin, Upload, Toast, Input } from '@douyinfe/semi-ui';
+import { Banner, Select, Switch, Button, Empty, Image, Modal, Spin, Upload, Toast, Input } from '@douyinfe/semi-ui';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDebounce } from './useDebounce';
 import { STYLE_DATAS}  from './config'
 import { IllustrationNoContent, IllustrationNoContentDark } from '@douyinfe/semi-illustrations';
-import { t } from 'i18next';
 import { fileToIOpenAttachment, fileToURL, urlToFile } from './uitl/shared';
 import { deepCopy, generateUuidByTime } from './uitl/uitls';
 import SourceIcon from './components/icons/source';
 import TargetIcon from './components/icons/target';
 import PerviewIcon from './components/icons/preview';
 import SaveIcon from './components/icons/save';
+import { getApiStyles, getApiTaskDetails, postApiAuth, postApiPhoto } from './uitl/api';
 export default function App() { 
-	const { Text } = Typography;
   
 	const [isAttachment, setIsAttachment] = useState(false);
-	const [photoDisabled, setPhotoDisabled] = useState(true);
 	const [targetSelected, setTargetSelected] = useState<any>({
 		filed: '',
 		recordId: '',
@@ -26,11 +24,38 @@ export default function App() {
 	const [selectStyle, setSelectStyle] = useState<any|null>([...STYLE_DATAS][0]);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [saveSelected, setSaveSelected] = useState<any>(null);
-	const [genResult, setGenResult] = useState<any>({
-		taskId: 1712242960339951,
-		"imageUrl": "https://mj.openai-next.com/mj/image/1712242960339951",
-	});
+	const [genResult, setGenResult] = useState<any>(null);
+	const [submitting, setSubmitting] = useState(false);
 	const uploadRef = useRef();
+	const gloalRef = useRef({ recount: 10, timer: 0});
+
+	const handleAuth = async () => {
+		const [err, res] = await postApiAuth();
+		if (!err && res &&  res.token) {
+			await bitable.bridge.setData({
+				authorization: res.token
+			});
+			handleStylesDatas()
+		} else {
+			Toast.error({ content: '授权失败,请尝试刷新。' });
+		}
+	}
+	const handleStylesDatas = async () => {
+		const [err, res] = await getApiStyles()
+		if (!err && res) {
+			setStyleDatas(res);
+			const newSel = deepCopy(res[0]);
+			setSelectStyle(newSel);
+		}
+	}
+	useEffect(() => {
+		handleAuth();
+		return () => {
+			if (gloalRef.current.timer) {
+				clearTimeout(gloalRef.current.timer)
+			}
+		}
+	}, [])
 
 	const checkIsAttachment = async (selection: any): Promise<[boolean, IAttachmentField]> => {
 		const { fieldId, tableId } = selection;
@@ -91,6 +116,7 @@ export default function App() {
 
 	useEffect(() => {
 		const off = bitable.base.onSelectionChange((event: any) => {
+			if (submitting) return;
 			if (!modalOpen) {
 				formatTargetData(event.data)
 			} else {
@@ -100,7 +126,7 @@ export default function App() {
 		return ()=> {
 			off();
 		}
-	}, [modalOpen])
+	}, [modalOpen, submitting])
 
 	const saveTable = useCallback(function saveTable(selected: any) {
     return selected.field.setValue(
@@ -111,7 +137,6 @@ export default function App() {
 	
 	const customRequest = useCallback(
     async (o: any) => {
-      console.log(o);
       const file = o.fileInstance;
       if (!file) {
         return;
@@ -184,7 +209,9 @@ export default function App() {
 	const getCurrentStyle = () => {
 		return selectStyle.selectImages.filter((item: { checked: any; }) => item.checked);
 	}
-	const handleGenerate = () => {
+	const handleGenerate = useDebounce( async () => {
+		console.log('submitting---', submitting)
+		if (submitting) return;
 		const selectCurTarget = getCurrentTarget();
 		const selectCurSource = getCurrentStyle();
 		if (!selectCurTarget || selectCurTarget.length === 0) {
@@ -195,11 +222,70 @@ export default function App() {
 			Toast.success({ content: '请选择模仿图片' });
 			return;
 		}
-		const { total } = selectCurSource[0];
+		const { total, url } = selectCurSource[0];
 		console.log(selectCurSource, selectCurTarget);
-		setPhotoDisabled(false);
+		const sourceUrls = selectCurTarget.slice(0, total).map((item: any) => {
+			return item.url
+		})
+		setSubmitting(true);
+		const [err, res] = await postApiPhoto(sourceUrls[0] ,url);
+		if (!err && res
+			&& res.result
+			&& res.result.result
+			&& res.result.code
+			&& [1, 2].includes(Number(res.result.code))) {
+			getGenResult(res.result.result, Number(res.result.code));
+		} else {
+			Toast.warning({ content: '生成失败。'})
+			setSubmitting(false);
+		}
+	}, 500);
+
+
+	const getGenResult = async (taskid: string, code: number) => {
+		const [err, res] = await getApiTaskDetails(taskid)
+		if (!err && res && res.result) {
+			if (code === 1 && res.result.imageUrl && res.result.status === "SUCCESS") {
+				setGenResult( {
+					taskid,
+					imageUrl: res.result.imageUrl,
+				});
+				setSubmitting(false);
+				return
+			}
+			retryGetTaskDetail(taskid, 0);
+		} else {
+			Toast.warning({ content: '生成失败。'})
+			setSubmitting(false);
+		}
 	}
 	
+	const retryGetTaskDetail = async (taskid: string, count: number) => {
+		gloalRef.current.timer = setTimeout(async () => {
+			const [err, res] = await getApiTaskDetails(taskid)
+			if (!err && res && res.result) {
+				if (res.result.imageUrl && res.result.status === "SUCCESS") {
+					setGenResult( {
+						taskid,
+						imageUrl: res.result.imageUrl,
+					});
+					setSubmitting(false);
+					return
+				} else {
+					if (count >= gloalRef.current.recount) {
+						Toast.warning({ content: '生成失败。'})
+						setSubmitting(false);
+						console.log('count---', count)
+						return
+					}
+					retryGetTaskDetail(taskid, count + 1);
+				}
+			} else {
+				Toast.warning({ content: '生成失败。'})
+				setSubmitting(false);
+			}
+		}, 5000);
+	}
 	const handleModalOk = async () => {
 		if(!saveSelected) {
 			Toast.warning({ content: `请选择正确的单元格！`});
@@ -220,7 +306,7 @@ export default function App() {
 		setModalOpen(false)
 	}
 	return (
-		<main className="main">
+		<main className="main" style={{ pointerEvents: submitting ? 'none' : 'auto'}}>
  			<Banner fullMode={false} type="info" bordered icon={null} closeIcon={null}
 				// title={<div style={{ fontWeight: 600, fontSize: '14px', lineHeight: '20px' }}></div>}
 				description={<div> 专属自己的AI照相馆</div>}
@@ -233,12 +319,11 @@ export default function App() {
             type="warning"
 						icon={<SourceIcon></SourceIcon>}
             closeIcon={null}
-            description={<div className="flex-btw"> 请选择有图片的单元格(源图片)
-							<Switch style={{ display: "none"}} checked={photoDisabled} onChange={setPhotoDisabled} size="small"></Switch></div> }
+            description={<div className="flex-btw"> 请选择有图片的单元格(源图片)</div> }
         >
         </Banner>
 				{
-					isAttachment ? <div style={{ marginTop: '4px', pointerEvents: !photoDisabled ? 'none' : 'auto' }} >
+					isAttachment ? <div style={{ marginTop: '4px' }} >
 						<Button size="small" onClick={() => (uploadRef.current as any)?.openFileDialog()}>
 									上传
 						</Button>
@@ -284,7 +369,7 @@ export default function App() {
             description="请选择需要模仿的照片风格"
         >
         </Banner>
-			  <Select defaultValue="career" onChange={(e: any) => {setSelectStyle(styleDatas.find((item: any) => item.key === e))}} style={{ width: '100%'}}>
+			  <Select defaultValue="career" onChange={(e: any) => {setSelectStyle(deepCopy(styleDatas.find((item: any) => item.key === e) || {}))}} style={{ width: '100%'}}>
 					{
 						styleDatas.map(( { key, label }) =>  <Select.Option value={key}>{label}</Select.Option> )
 					}
@@ -307,7 +392,7 @@ export default function App() {
 							</div>
 						 </div> : null
 				}
-				<Button type="primary" style={{ marginTop: '12px'}} onClick={handleGenerate}>生成</Button>
+				<Button loading={submitting}  type="primary" style={{ marginTop: '12px'}} onClick={handleGenerate}>生成</Button>
 			
 			 {
 				genResult ? <>
@@ -318,7 +403,7 @@ export default function App() {
 								type="warning"
 								closeIcon={null}
 								icon={<PerviewIcon></PerviewIcon>}
-								description={ <div className="flex-btw">预览结果
+								description={ <div className="flex-btw">点击图片预览
 									<Button size="small" onClick={() => {setModalOpen(true); setSaveSelected(null);}} >{ modalOpen ? '保存中' : '保存' }</Button></div>}
 						>
 					</Banner>
@@ -356,7 +441,6 @@ export default function App() {
 						</Input>
 					}
 				</Modal>
-
 		</main>
 	)
 }
