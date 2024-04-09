@@ -6,6 +6,7 @@ const getConfig = async () => {
 	const userid = await bitable.bridge.getUserId();
 	const cacheDatas: any = await bitable.bridge.getData('authorization');
 	const config = {
+		withCredentials: true,
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
 			authorization: `auth ${cacheDatas}`,
@@ -29,6 +30,7 @@ export const getApiTaskDetails = async (taskId: string) => {
 export const postApiAuth = async () => {
 	const userid = await bitable.bridge.getUserId();
 	const config = {
+		withCredentials: true,
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
 		}
