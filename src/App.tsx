@@ -32,9 +32,7 @@ export default function App() {
 	const handleAuth = async () => {
 		const [err, res] = await postApiAuth();
 		if (!err && res &&  res.token) {
-			await bitable.bridge.setData({
-				authorization: res.token
-			});
+			await bitable.bridge.setData("authorization", res.token);
 			handleStylesDatas()
 		} else {
 			Toast.error({ content: '授权失败,请尝试刷新。' });

@@ -4,11 +4,11 @@ const API_BASE_URL = 'http://localhost:3000';
 
 const getConfig = async () => {
 	const userid = await bitable.bridge.getUserId();
-	const cacheDatas: any = await bitable.bridge.getData() || {};
+	const cacheDatas: any = await bitable.bridge.getData('authorization');
 	const config = {
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
-			authorization: `auth ${cacheDatas?.authorization}`,
+			authorization: `auth ${cacheDatas}`,
 			authuseid: userid,
 		}
 	};
