@@ -1,0 +1,4 @@
+{
+	"build_command": "npm run build:frontend",
+	"start_command": "npm run build:frontend"
+}
