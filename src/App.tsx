@@ -1,4 +1,4 @@
-import './app.css';
+import './App.css';
 import { bitable, FieldType, IAttachmentField, } from "@lark-base-open/js-sdk";
 import { Banner, Select, Switch, Button, Empty, Image, Modal, Spin, Upload, Toast, Input } from '@douyinfe/semi-ui';
 import { useState, useEffect, useRef, useCallback } from 'react';
