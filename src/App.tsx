@@ -339,8 +339,8 @@ export default function App() {
 							<div style={{ display: 'flex', flexWrap: 'wrap' }}>
 								{
 								 targetSelected && targetSelected.selectImages ? 	targetSelected.selectImages.map((item: any, index: number) => 
-										<div style={{ position: 'relative'}}>
-											<img style={{ cursor: 'pointer', width: '80px', height: '80px', margin: '4px' }}
+										<div style={{ position: 'relative', margin: '4px'}} className="show-img-border" >
+											<img className="show-img  "
 												onClick={() => {
 													handleSelectMulTarget(index)
 												}}  
