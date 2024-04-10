@@ -1,6 +1,8 @@
 import { bitable } from '@lark-base-open/js-sdk';
 import axios from 'axios';
-const API_BASE_URL = 'https://stylephotoserver.zeabur.app';
+// const API_BASE_URL =  'https://stylephotoserver.zeabur.app'; 
+const API_BASE_URL =  (import.meta as any).env.MODE === 'production' ?  'https://stylephotoserver.zeabur.app' :  "http://localhost:3000"; // dev
+
 axios.defaults.withCredentials = true; 
 const getConfig = async () => {
 	const userid = await bitable.bridge.getUserId();

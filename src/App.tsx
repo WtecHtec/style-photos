@@ -20,8 +20,8 @@ export default function App() {
 		recordId: '',
 		selectImages: [],
 	});
-	const [styleDatas, setStyleDatas] = useState([...STYLE_DATAS])
-	const [selectStyle, setSelectStyle] = useState<any|null>([...STYLE_DATAS][0]);
+	const [styleDatas, setStyleDatas] = useState<any[]>([])
+	const [selectStyle, setSelectStyle] = useState<any|null>(null);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [saveSelected, setSaveSelected] = useState<any>(null);
 	const [genResult, setGenResult] = useState<any>(null);

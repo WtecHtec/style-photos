@@ -4,9 +4,9 @@
   "type": "module",
   "description": "React TypeScript on Replit, using Vite bundler",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "build:frontend": "tsc && vite build",
+    "dev": "vite --mode dev",
+    "build": "tsc && vite build --mode production",
+    "build:frontend": "tsc && vite build --mode production",
     "preview": "vite preview"
   },
   "keywords": [],
