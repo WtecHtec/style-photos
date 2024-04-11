@@ -5,8 +5,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDebounce } from './useDebounce';
 import { STYLE_DATAS}  from './config'
 import { IllustrationNoContent, IllustrationNoContentDark } from '@douyinfe/semi-illustrations';
-import { fileToIOpenAttachment, fileToURL, urlToFile } from './uitl/shared';
-import { deepCopy, generateUuidByTime } from './uitl/uitls';
+import { base64ToFile, fileToIOpenAttachment, fileToURL, urlToFile } from './uitl/shared';
+import { deepCopy, generateUuidByTime, mergeImage } from './uitl/uitls';
 import SourceIcon from './components/icons/source';
 import TargetIcon from './components/icons/target';
 import PerviewIcon from './components/icons/preview';
@@ -27,8 +27,10 @@ export default function App() {
 	const [genResult, setGenResult] = useState<any>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const uploadRef = useRef();
-	const gloalRef = useRef({ recount: 10, timer: 0});
-
+	const canvasRef = useRef<any>();
+	const gloalRef = useRef<any>({ recount: 10, timer: 0});
+	const [saving, setSaving ] = useState(false);
+ 
 	const handleAuth = async () => {
 		const [err, res] = await postApiAuth();
 		if (!err && res &&  res.token) {
@@ -49,12 +51,16 @@ export default function App() {
 	useEffect(() => {
 		handleAuth();
 		return () => {
-			if (gloalRef.current.timer) {
-				clearTimeout(gloalRef.current.timer)
-			}
+			clearRetryTimer();
 		}
 	}, [])
 
+	const clearRetryTimer = () => {
+		if (gloalRef.current.timer) {
+			clearTimeout(gloalRef.current.timer);
+			gloalRef.current.timer = null;
+		}
+	}
 	const checkIsAttachment = async (selection: any): Promise<[boolean, IAttachmentField]> => {
 		const { fieldId, tableId } = selection;
 		const table = await bitable.base.getTableById(tableId);
@@ -213,83 +219,157 @@ export default function App() {
 		const selectCurTarget = getCurrentTarget();
 		const selectCurSource = getCurrentStyle();
 		if (!selectCurTarget || selectCurTarget.length === 0) {
-			Toast.success({ content: '请选择源图片' });
+			Toast.warning({ content: '请选择源图片' });
 			return;
 		}
 		if (!selectCurSource || selectCurSource.length === 0) {
-			Toast.success({ content: '请选择模仿图片' });
+			Toast.warning({ content: '请选择模仿图片' });
 			return;
 		}
-		const { total, url } = selectCurSource[0];
+		const { total, blocks } = selectCurSource[0];
+		if (total < selectCurTarget.length) {
+			Toast.warning({ content: '源图片数量不能大于模仿图片中人数' });
+			return;
+		}
+		if (total > selectCurTarget.length) {
+			Toast.warning({ content: '源图片数量不能小于模仿图片中人数' });
+			return;
+		}
+		if (total > 1 && (!blocks || blocks.length !== total)) {
+			Toast.error({ content: '数据异常' });
+			return;
+		}
 		console.log(selectCurSource, selectCurTarget);
-		const sourceUrls = selectCurTarget.slice(0, total).map((item: any) => {
+		const sourceUrls = selectCurTarget.map((item: any) => {
 			return item.url
 		})
 		setSubmitting(true);
-		const [err, res] = await postApiPhoto(sourceUrls[0] ,url);
-		if (!err && res
-			&& res.result
-			&& res.result.result
-			&& res.result.code
-			&& [1, 2].includes(Number(res.result.code))) {
-			getGenResult(res.result.result, Number(res.result.code));
-		} else {
+		const photoDatas = await handlePhotos(sourceUrls, selectCurSource[0]);
+		console.log('photoDatas---', photoDatas);
+		if (!photoDatas) {
 			Toast.warning({ content: '生成失败。'})
 			setSubmitting(false);
+			return;
 		}
+		createImageResult(photoDatas);
 	}, 500);
+
+	const handlePhotos = async (sourceUrls: any, selectCurSource: any ) => {
+		const { total, url, blocks } = selectCurSource
+		const results = [];
+		for (let i = 0 ; i < sourceUrls.length; i++) {
+			const [err, res] = await postApiPhoto(sourceUrls[i], total === 1 ? url : blocks[i]);
+			if (!err && res
+				&& res.result
+				&& res.result.result
+				&& res.result.code
+				&& [1, 22].includes(Number(res.result.code))) {
+				const itemRes = await getGenResult(res.result.result, Number(res.result.code));
+				if (!itemRes) {
+					return;
+				}
+				results.push(itemRes);
+			} else {
+				return;
+			}
+		}
+		if (results.length !== total) {
+			return;
+		}
+		return { url, results, total };
+	}
+
+
+	const createImageResult = async ( photoData: any ) => {
+		if (!photoData)  {
+			setSubmitting(false);
+			return;
+		}
+		const { url, results, total } = photoData;
+		if (total === 1) {
+			setGenResult({
+				type: 'url',
+				imageUrl: results[0].imageUrl,
+			})
+			setSubmitting(false);
+			return;
+		}
+		const base64 = await mergeImage(url, canvasRef.current,  results.map((item: any) => item.imageUrl))
+		if (!base64) {
+			Toast.warning({ content: '生成失败。'})
+			setSubmitting(false);
+			return
+		}
+		setGenResult({
+			type: 'base64',
+			imageUrl: base64,
+		})
+		setSubmitting(false);
+	}
 
 
 	const getGenResult = async (taskid: string, code: number) => {
 		const [err, res] = await getApiTaskDetails(taskid)
 		if (!err && res && res.result) {
 			if (code === 1 && res.result.imageUrl && res.result.status === "SUCCESS") {
-				setGenResult( {
-					taskid,
-					imageUrl: res.result.imageUrl,
-				});
-				setSubmitting(false);
-				return
+				console.log('res--- taskid', res)
+				return { taskid, imageUrl: res.result.imageUrl}
 			}
-			retryGetTaskDetail(taskid, 0);
+			return await retryGetTaskDetail(taskid, 0);
 		} else {
-			Toast.warning({ content: '生成失败。'})
-			setSubmitting(false);
+			return null
 		}
 	}
 	
-	const retryGetTaskDetail = async (taskid: string, count: number) => {
-		gloalRef.current.timer = setTimeout(async () => {
-			const [err, res] = await getApiTaskDetails(taskid)
-			if (!err && res && res.result) {
-				if (res.result.imageUrl && res.result.status === "SUCCESS") {
-					setGenResult( {
-						taskid,
-						imageUrl: res.result.imageUrl,
-					});
-					setSubmitting(false);
-					return
-				} else {
-					if (count >= gloalRef.current.recount) {
-						Toast.warning({ content: '生成失败。'})
-						setSubmitting(false);
-						console.log('count---', count)
-						return
+	const retryGetTaskDetail = (taskid: string, count: number)=> {
+		// 隔 5 s去请求
+		const getTaskDetail =  (taskid: string): Promise<any>  => {
+			return new Promise( (resolve) => {
+				setTimeout(async () => {
+					const [err, res] = await getApiTaskDetails(taskid)
+					if (!err && res && res.result) {
+						if (res.result.imageUrl && res.result.status === "SUCCESS") {
+							resolve([0 ,{
+								taskid,
+								imageUrl: res.result.imageUrl,
+							}]);
+						} else {
+							resolve([2, ''])
+						}
+					} else {
+						return [-1, ''];
 					}
-					retryGetTaskDetail(taskid, count + 1);
+				}, 5000);
+			})
+		}
+		return new Promise(async (resolve) => {
+			let recount  = gloalRef.current.recount
+			while(recount) {
+				const [err, res] = await getTaskDetail(taskid);
+				if (err === -1) {
+					resolve('');
+					return
+				} else if (err === 2) {
+					recount = recount - 1;
+					console.log('重试', recount)
+				} else {
+					resolve(res);
 				}
-			} else {
-				Toast.warning({ content: '生成失败。'})
-				setSubmitting(false);
 			}
-		}, 5000);
+			console.log('重试失败');
+			resolve('');
+		})
 	}
 	const handleModalOk = async () => {
+		if (saving) return
 		if(!saveSelected) {
 			Toast.warning({ content: `请选择正确的单元格！`});
 			return
 		}
-		const file = await urlToFile(genResult.imageUrl, `${generateUuidByTime()}.png`, 'image/png')
+		setSaving(true);
+		const file = genResult.type === 'url' ?
+		 await urlToFile(genResult.imageUrl, `${generateUuidByTime()}.png`, 'image/png')
+		 : await base64ToFile(genResult.imageUrl, `${generateUuidByTime()}.png`, 'image/png')
 		const newSelectImage = {
 			val: await fileToIOpenAttachment(bitable.base, file),
 			url: await fileToURL(file),
@@ -302,6 +382,7 @@ export default function App() {
 		};
 		saveTable(newSelected);
 		setModalOpen(false)
+		setSaving(false);
 	}
 	return (
 		<main className="main" style={{ pointerEvents: submitting ? 'none' : 'auto'}}>
@@ -418,7 +499,7 @@ export default function App() {
 					title="正在保存"
 					visible={modalOpen}
 					onOk={handleModalOk}
-					onCancel={() => {setModalOpen(false)}}
+					onCancel={() => { !saving && setModalOpen(false)}}
 					maskClosable={false}
 					width={360}
 				>
@@ -439,6 +520,7 @@ export default function App() {
 						</Input>
 					}
 				</Modal>
+				<canvas ref={canvasRef} style={{ position: 'absolute', zIndex: '-9999', display: 'none'}}></canvas>
 		</main>
 	)
 }

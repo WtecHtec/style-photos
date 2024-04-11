@@ -60,3 +60,49 @@ export const deepCopy = (obj: any) => {
 
 
 
+/**
+ * 获取图片信息
+ * @param imgurl
+ * @returns 
+ */
+export const getImgInfo = (imgurl: string): Promise<any> => {
+	return new  Promise(resolve => {
+		const img = new Image();
+		img.crossOrigin = 'anonymous';
+		img.src = imgurl;
+		img.onload = () => {
+			resolve(['', {
+				image: img,
+				width: img.width,
+				height: img.height,
+			}])
+		}
+		img.onerror = (err) => {
+			resolve([err, '']);
+		};
+	})
+}
+
+
+export const mergeImage = async (sourceImg: string, canvas: any, targetImgs:any) => {
+	const [err, res] = await getImgInfo(sourceImg);
+	if (err) return ''
+	const ctx = canvas.getContext('2d');
+	canvas.width = res.width;
+	canvas.height = res.height;
+	let x = 0;
+	for (let i = 0; i < targetImgs.length; i++) {
+		const [err, res] = await getImgInfo(targetImgs[i]);
+		if (err) return ''
+		ctx.drawImage(res.image, x, 0, res.width, res.height);
+		x = x + res.width
+	}
+	try {
+		return 	canvas.toDataURL();
+	} catch (error) {
+		console.log('error---', error);
+		return  '';
+	}
+}
+
+
