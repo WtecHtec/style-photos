@@ -32,6 +32,12 @@ export default function App() {
 	const [saving, setSaving ] = useState(false);
  
 	const handleAuth = async () => {
+		const tid = Toast.info({
+			showClose: false,
+			duration: 0,
+			icon: <Spin />,
+			content: 'loading',
+		});
 		const [err, res] = await postApiAuth();
 		if (!err && res &&  res.token) {
 			await bitable.bridge.setData("authorization", res.token);
@@ -39,6 +45,7 @@ export default function App() {
 		} else {
 			Toast.error({ content: '授权失败,请尝试刷新。' });
 		}
+		Toast.close(tid);
 	}
 	const handleStylesDatas = async () => {
 		const [err, res] = await getApiStyles()
@@ -244,22 +251,22 @@ export default function App() {
 			return item.url
 		})
 		setSubmitting(true);
-		// const photoDatas = await handlePhotos(sourceUrls, selectCurSource[0]);
-		const photoDatas = {
-			url: "https://stylephotoserver.zeabur.app/images/wedding/wedding_db_1.png",
-			// url: "http://localhost:3000/images/wedding/wedding_db_1.png",
-			total: 2,
-			results: [{
-				imageUrl: "https://mj.openai-next.com/mj/image/1712882258045974",
-				taskid: "1712882258045974"
-			},
-			{
-				imageUrl: "https://mj.openai-next.com/mj/image/1712882302777085",
-        taskid: "1712882302777085"
-			}
-		]
-		}
-		console.log('photoDatas---', photoDatas);
+		const photoDatas = await handlePhotos(sourceUrls, selectCurSource[0]);
+		// const photoDatas = {
+		// 	url: "https://stylephotoserver.zeabur.app/images/wedding/wedding_db_1.png",
+		// 	// url: "http://localhost:3000/images/wedding/wedding_db_1.png",
+		// 	total: 2,
+		// 	results: [{
+		// 		imageUrl: "https://mj.openai-next.com/mj/image/1712882258045974",
+		// 		taskid: "1712882258045974"
+		// 	},
+		// 	{
+		// 		imageUrl: "https://mj.openai-next.com/mj/image/1712882302777085",
+    //     taskid: "1712882302777085"
+		// 	}
+		// ]
+		// }
+		// console.log('photoDatas---', photoDatas);
 		if (!photoDatas) {
 			Toast.warning({ content: '生成失败。'})
 			setSubmitting(false);
