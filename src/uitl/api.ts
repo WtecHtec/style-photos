@@ -57,16 +57,21 @@ export const getApiStyles = async () => {
 
 
 
-export const postApiPhoto = async (sourceurl: string, targeturl:string) => {
+export const postApiPhoto = async (sourceurl: string, targeturl:string, delay: number = 5): Promise<any> => {
 	const config = await getConfig();
-	try {
-		const response = await axios.post(`${API_BASE_URL}/photo`, 
-			{ sourceurl: encodeURIComponent(sourceurl), 
-				targeturl: encodeURIComponent(targeturl) }, config);
-		return ['', response.data];
-	} catch (error) {
-		return [error, ''];
-	}
+	return new Promise((resovle => {
+		setTimeout( async () => {
+			try {
+				const response = await axios.post(`${API_BASE_URL}/photo`, 
+					{ sourceurl: encodeURIComponent(sourceurl), 
+						targeturl: encodeURIComponent(targeturl) }, config);
+						resovle(['', response.data]);
+			} catch (error) {
+				resovle([error, '']);
+			}
+		}, 1000 * delay);
+	}))
+
 }
 
 

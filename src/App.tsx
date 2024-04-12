@@ -278,6 +278,8 @@ export default function App() {
 	const handlePhotos = async (sourceUrls: any, selectCurSource: any ) => {
 		const { total, url, blocks } = selectCurSource
 		const results = [];
+		// await getGenResult('1712898203252403', 2);
+		// return;
 		for (let i = 0 ; i < sourceUrls.length; i++) {
 			const [err, res] = await postApiPhoto(sourceUrls[i], total === 1 ? url : blocks[i]);
 			if (!err && res
@@ -330,44 +332,46 @@ export default function App() {
 
 
 	const getGenResult = async (taskid: string, code: number) => {
-		const [err, res] = await getApiTaskDetails(taskid)
-		if (!err && res && res.result) {
-			if (code === 1 && res.result.imageUrl && res.result.status === "SUCCESS") {
-				console.log('res--- taskid', res)
-				return { taskid, imageUrl: res.result.imageUrl}
-			}
-			return await retryGetTaskDetail(taskid, 0);
+		const [err, res] = await getTaskDetail(taskid)
+		console.log('code--', code);
+		if (err === 0) {
+			return res;
+		} else if (err === 2) {
+			return await retryGetTaskDetail(taskid);
 		} else {
 			return null
 		}
 	}
-	
-	const retryGetTaskDetail = (taskid: string, count: number)=> {
-		// 隔 5 s去请求
-		const getTaskDetail =  (taskid: string): Promise<any>  => {
-			let timer = null;
-			return new Promise( (resolve) => {
-				timer = setTimeout(async () => {
-					const [err, res] = await getApiTaskDetails(taskid)
-					if (!err && res && res.result) {
-						if (res.result.imageUrl && res.result.status === "SUCCESS") {
-							resolve([0 ,{
-								taskid,
-								imageUrl: res.result.imageUrl,
-							}]);
-						} else {
-							resolve([2, ''])
-						}
+	// 隔 5 s去请求
+	const getTaskDetail =  (taskid: string, delay: number = 5): Promise<any>  => {
+		let timer: number | null | undefined = null;
+		return new Promise( (resolve) => {
+			timer = setTimeout(async () => {
+				const [err, res] = await getApiTaskDetails(taskid)
+				if (!err && res && res.result) {
+					if (res.result.imageUrl && res.result.status === "SUCCESS") {
+						if (timer) clearTimeout(timer);
+						resolve([0 ,{
+							taskid,
+							imageUrl: res.result.imageUrl,
+						}]);
 					} else {
-						return [-1, ''];
+						if (timer) clearTimeout(timer);
+						resolve([2, ''])
 					}
-				}, 5000);
-			})
-		}
+				} else {
+					if (timer) clearTimeout(timer);
+					resolve([-1, '']);
+				}
+			}, 1000 * delay);
+		})
+	}
+	const retryGetTaskDetail = (taskid: string,)=> {
+		
 		return new Promise(async (resolve) => {
 			let recount  = gloalRef.current.recount
 			while(recount) {
-				const [err, res] = await getTaskDetail(taskid);
+				const [err, res] = await getTaskDetail(taskid, 60);
 				if (err === -1) {
 					resolve('');
 					return
@@ -376,6 +380,7 @@ export default function App() {
 					console.log('重试', recount)
 				} else {
 					resolve(res);
+					return
 				}
 			}
 			console.log('重试失败');
