@@ -244,7 +244,21 @@ export default function App() {
 			return item.url
 		})
 		setSubmitting(true);
-		const photoDatas = await handlePhotos(sourceUrls, selectCurSource[0]);
+		// const photoDatas = await handlePhotos(sourceUrls, selectCurSource[0]);
+		const photoDatas = {
+			url: "https://stylephotoserver.zeabur.app/images/wedding/wedding_db_1.png",
+			// url: "http://localhost:3000/images/wedding/wedding_db_1.png",
+			total: 2,
+			results: [{
+				imageUrl: "https://mj.openai-next.com/mj/image/1712882258045974",
+				taskid: "1712882258045974"
+			},
+			{
+				imageUrl: "https://mj.openai-next.com/mj/image/1712882302777085",
+        taskid: "1712882302777085"
+			}
+		]
+		}
 		console.log('photoDatas---', photoDatas);
 		if (!photoDatas) {
 			Toast.warning({ content: '生成失败。'})
@@ -324,8 +338,9 @@ export default function App() {
 	const retryGetTaskDetail = (taskid: string, count: number)=> {
 		// 隔 5 s去请求
 		const getTaskDetail =  (taskid: string): Promise<any>  => {
+			let timer = null;
 			return new Promise( (resolve) => {
-				setTimeout(async () => {
+				timer = setTimeout(async () => {
 					const [err, res] = await getApiTaskDetails(taskid)
 					if (!err && res && res.result) {
 						if (res.result.imageUrl && res.result.status === "SUCCESS") {
