@@ -410,7 +410,7 @@ export default function App() {
 		<main className="main" style={{ pointerEvents: submitting ? 'none' : 'auto'}}>
  			<Banner fullMode={false} type="info" bordered icon={null} closeIcon={null}
 				// title={<div style={{ fontWeight: 600, fontSize: '14px', lineHeight: '20px' }}></div>}
-				description={<div> 专属自己的AI照相馆</div>}
+				description={<div> 专属自己的AI照相馆; 注意图片性别顺序;</div>}
       />
 
 				<Banner
